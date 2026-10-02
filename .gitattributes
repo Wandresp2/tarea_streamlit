@@ -1,0 +1,10 @@
+# Mantener scripts shell con finales de línea Unix (LF)
+*.sh text eol=lf
+
+# Archivos de texto normales
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+.gitignore text eol=lf

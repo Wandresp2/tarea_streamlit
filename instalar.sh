@@ -10,50 +10,6 @@ echo " INSTALACIÓN AUTOMÁTICA"
 echo " Proyecto Astronomía / Exoplanetas"
 echo "======================================"
 
-# --------------------------------------------------
-# [1/4] Limpieza total de Docker
-# --------------------------------------------------
-
-echo ""
-echo "======================================"
-echo " [1/4] LIMPIANDO DOCKER"
-echo "======================================"
-
-echo "[1/5] Deteniendo todos los contenedores..."
-sudo docker stop $(sudo docker ps -aq) 2>/dev/null || true
-
-echo "[2/5] Eliminando todos los contenedores..."
-sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
-
-echo "[3/5] Eliminando todas las imágenes..."
-sudo docker rmi -f $(sudo docker images -aq) 2>/dev/null || true
-
-echo "[4/5] Eliminando todos los volúmenes..."
-sudo docker volume rm $(sudo docker volume ls -q) 2>/dev/null || true
-
-echo "[5/5] Limpiando redes, caché y recursos..."
-sudo docker system prune -a --volumes -f
-
-echo ""
-echo "Docker limpio."
-echo "Contenedores:"
-sudo docker ps -a
-echo ""
-echo "Imágenes:"
-sudo docker images
-echo ""
-echo "Volúmenes:"
-sudo docker volume ls
-
-# --------------------------------------------------
-# [2/4] Crear contenedores con Docker Compose
-# --------------------------------------------------
-
-echo ""
-echo "======================================"
-echo " [2/4] CREANDO MYSQL 8.4 (Docker Compose)"
-echo "======================================"
-
 # Preferir docker compose (plugin); fallback a docker-compose
 if sudo docker compose version >/dev/null 2>&1; then
   COMPOSE_CMD="sudo docker compose"
@@ -63,6 +19,48 @@ else
   echo "ERROR: No se encontró 'docker compose' ni 'docker-compose'."
   exit 1
 fi
+
+# --------------------------------------------------
+# [1/4] Limpieza SOLO de recursos de este proyecto
+# --------------------------------------------------
+
+echo ""
+echo "======================================"
+echo " [1/4] LIMPIANDO RECURSOS DEL PROYECTO"
+echo "======================================"
+
+echo "[1/5] Deteniendo y eliminando servicios de docker-compose..."
+$COMPOSE_CMD -f "$SCRIPT_DIR/docker-compose.yml" down -v --remove-orphans 2>/dev/null || true
+
+echo "[2/5] Eliminando contenedores del proyecto (si existen)..."
+for CONTAINER in mysql84 jupyter; do
+  if sudo docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+    sudo docker rm -f "$CONTAINER" 2>/dev/null || true
+    echo "  Contenedor eliminado: $CONTAINER"
+  fi
+done
+
+echo "[3/5] Eliminando volumen del proyecto..."
+sudo docker volume rm mysql84-data 2>/dev/null || true
+
+echo "[4/5] Eliminando red del proyecto..."
+sudo docker network rm ciencia-net 2>/dev/null || true
+
+echo "[5/5] Eliminando imágenes usadas por este proyecto..."
+sudo docker rmi -f mysql:8.4 2>/dev/null || true
+sudo docker rmi -f quay.io/jupyter/scipy-notebook:latest 2>/dev/null || true
+
+echo ""
+echo "Limpieza del proyecto completada (el resto de Docker no se tocó)."
+
+# --------------------------------------------------
+# [2/4] Crear contenedores con Docker Compose
+# --------------------------------------------------
+
+echo ""
+echo "======================================"
+echo " [2/4] CREANDO MYSQL 8.4 (Docker Compose)"
+echo "======================================"
 
 $COMPOSE_CMD -f "$SCRIPT_DIR/docker-compose.yml" up -d
 
@@ -109,17 +107,36 @@ echo "======================================"
 echo " [3/4] ETL -> MySQL"
 echo "======================================"
 
-PYTHON_BIN=""
+SYSTEM_PYTHON=""
 if command -v python3 >/dev/null 2>&1; then
-  PYTHON_BIN="python3"
+  SYSTEM_PYTHON="python3"
 elif command -v python >/dev/null 2>&1; then
-  PYTHON_BIN="python"
+  SYSTEM_PYTHON="python"
 else
   echo "ERROR: No se encontró Python (python3/python)."
   exit 1
 fi
 
-echo "Usando intérprete: $PYTHON_BIN"
+VENV_DIR="$SCRIPT_DIR/.venv"
+
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+  echo "Creando entorno virtual en .venv..."
+  if ! "$SYSTEM_PYTHON" -m venv "$VENV_DIR" 2>/dev/null; then
+    echo "El módulo venv no está disponible. Intentando instalar python3-venv..."
+    if command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update -y
+      sudo apt-get install -y python3-venv python3-pip
+    else
+      echo "ERROR: No se pudo crear el venv. Instala python3-venv manualmente."
+      exit 1
+    fi
+    "$SYSTEM_PYTHON" -m venv "$VENV_DIR"
+  fi
+fi
+
+PYTHON_BIN="$VENV_DIR/bin/python"
+echo "Usando intérprete del venv: $PYTHON_BIN"
+
 echo "Instalando dependencias desde requirements.txt..."
 "$PYTHON_BIN" -m pip install --upgrade pip
 "$PYTHON_BIN" -m pip install -r "$SCRIPT_DIR/requirements.txt"

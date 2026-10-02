@@ -51,7 +51,7 @@ df_master = load_master_data()
 # --------------------------------------------------
 # 3. MENÚ LATERAL Y FILTROS GLOBALES
 # --------------------------------------------------
-st.sidebar.title("🌌 Navegación Analítica")
+st.sidebar.title("🌌 Navegación Analítica — creado por: Andres David Perez")
 st.sidebar.markdown("---")
 
 modulo = st.sidebar.radio(

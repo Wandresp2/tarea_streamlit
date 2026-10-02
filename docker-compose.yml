@@ -1,0 +1,48 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql84
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: astronomia
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql84-data:/var/lib/mysql
+    networks:
+      - ciencia-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # Jupyter Lab (opcional, no forma parte del flujo de instalar.sh)
+  # jupyter:
+  #   image: quay.io/jupyter/scipy-notebook:latest
+  #   container_name: jupyter
+  #   restart: unless-stopped
+  #   environment:
+  #     JUPYTER_TOKEN: facil123
+  #     MYSQL_ROOT_PASSWORD: root
+  #     MYSQL_DATABASE: astronomia
+  #   ports:
+  #     - "8888:8888"
+  #   volumes:
+  #     - ./notebooks:/home/jovyan/work
+  #   networks:
+  #     - ciencia-net
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+
+networks:
+  ciencia-net:
+    name: ciencia-net
+    driver: bridge
+
+volumes:
+  mysql84-data:
+    name: mysql84-data
